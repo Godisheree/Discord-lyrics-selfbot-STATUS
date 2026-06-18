@@ -1,0 +1,6 @@
+requests
+syncedlyrics
+logbook
+winrt-runtime
+winrt-Windows.Foundation
+winrt-Windows.Media.Control
