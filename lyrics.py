@@ -92,10 +92,15 @@ def update_discord_status(text):
     except:
         pass
 
+_media_manager = None
+
 async def get_media_info():
+    global _media_manager
     try:
-        sessions = await MediaManager.request_async()
-        session = sessions.get_current_session()
+        if not _media_manager:
+            _media_manager = await MediaManager.request_async()
+            
+        session = _media_manager.get_current_session()
 
         if session:
             playback = session.get_playback_info()
@@ -265,7 +270,7 @@ async def main_loop():
                         clear_line_area()
                         render(info["title"], info["artist"], pos, current_line)
 
-            await asyncio.sleep(0.02)
+            await asyncio.sleep(0.2)
 
     finally:
         show_cursor()
