@@ -147,17 +147,23 @@ async def get_media_info():
             now = datetime.now(timezone.utc)
             diff = (now - timeline.last_updated_time).total_seconds()
 
+            position = timeline.position.total_seconds() + diff
+            duration = timeline.end_time.total_seconds() if timeline.end_time else None
+            if duration and position > duration:
+                position = duration
+
             return {
                 "title": props.title,
                 "artist": props.artist,
-                "position": timeline.position.total_seconds() + diff,
-                "duration": timeline.end_time.total_seconds() if timeline.end_time else None,
+                "position": position,
+                "duration": duration,
                 "status": playback.playback_status
             }
 
     except:
         pass
 
+    _media_manager = None
     return {"status": None}
 
 def is_advertisement(title, artist):
@@ -276,14 +282,18 @@ async def main_loop():
             status = info.get("status")
 
             if status == GlobalSystemMediaTransportControlsSessionPlaybackStatus.PAUSED:
-                schedule_status(None)
+                if not status_cleared:
+                    status_cleared = True
+                    schedule_status(None)
                 current_line = None
                 last_sent_index = -1
                 await asyncio.sleep(1)
                 continue
 
             if status != GlobalSystemMediaTransportControlsSessionPlaybackStatus.PLAYING:
-                schedule_status(None)
+                if not status_cleared:
+                    status_cleared = True
+                    schedule_status(None)
                 current_line = None
                 last_sent_index = -1
                 await asyncio.sleep(1)
@@ -294,6 +304,7 @@ async def main_loop():
             pos = raw_pos + LYRIC_OFFSET
 
             if song_id != current_song:
+                schedule_status(None)
                 current_song = song_id
                 _active_song = song_id
                 current_line = None
@@ -339,11 +350,10 @@ async def main_loop():
 
                     if time_until_next <= latency and time_until_next >= 0:
                         sync_text = status_text(next_text) if next_text else "\U0001F3B5"
-                        is_inst = sync_text == "\U0001F3B5"
-                        if sync_text and (not is_inst or first_lyric_sent) and sync_text != current_line:
+                        if sync_text and sync_text != current_line:
                             current_line = sync_text
                             last_sent_index = next_idx
-                            if not is_inst:
+                            if sync_text != "\U0001F3B5":
                                 first_lyric_sent = True
                             schedule_status(sync_text)
                             clear_line_area()
@@ -355,17 +365,17 @@ async def main_loop():
                 if cur_idx is not None and last_sent_index < cur_idx:
                     _, cur_text = current_lyrics[cur_idx]
                     sync_text = status_text(cur_text) if cur_text else "\U0001F3B5"
-                    is_inst = sync_text == "\U0001F3B5"
-                    if sync_text and (not is_inst or first_lyric_sent) and sync_text != current_line:
-                        current_line = sync_text
-                        last_sent_index = cur_idx
-                        if not is_inst:
-                            first_lyric_sent = True
-                        schedule_status(sync_text)
-                        clear_line_area()
-                        render(info["title"], info["artist"], raw_pos, current_line)
-                    elif sync_text and is_inst and not first_lyric_sent:
-                        last_sent_index = cur_idx
+                    if sync_text and sync_text != current_line:
+                        if sync_text == "\U0001F3B5" and not first_lyric_sent:
+                            last_sent_index = cur_idx
+                        else:
+                            current_line = sync_text
+                            last_sent_index = cur_idx
+                            if sync_text != "\U0001F3B5":
+                                first_lyric_sent = True
+                            schedule_status(sync_text)
+                            clear_line_area()
+                            render(info["title"], info["artist"], raw_pos, current_line)
 
             await asyncio.sleep(0.2)
 
