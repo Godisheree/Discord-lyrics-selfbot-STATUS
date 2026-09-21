@@ -168,7 +168,13 @@ async def get_media_info():
 
 def is_advertisement(title, artist):
     combined = f"{title or ''} {artist or ''}".lower()
-    return "advertisement" in combined
+    if not combined.strip():
+        return True
+    if "advertisement" in combined:
+        return True
+    if re.search(r"(^|\s)ad(\s|$)", combined):
+        return True
+    return False
 
 def search_lrclib(title, artist, duration=None):
     url = "https://lrclib.net/api/search"
